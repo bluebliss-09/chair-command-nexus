@@ -1,4 +1,3 @@
-
 import React, { useRef, useEffect } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from '@react-three/drei';
@@ -289,7 +288,7 @@ const ChairScene = (props) => {
     
     // Enable shadows
     scene.traverse((object) => {
-      if (object.isMesh) {
+      if (object instanceof THREE.Mesh) {
         object.castShadow = true;
         object.receiveShadow = true;
       }
