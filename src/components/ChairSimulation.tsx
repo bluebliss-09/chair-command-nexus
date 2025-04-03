@@ -1,7 +1,8 @@
 
 import React, { useRef, useEffect } from 'react';
 import * as THREE from 'three';
-import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
+import { OrbitControls } from '@react-three/drei';
+import { Canvas, useFrame, extend, useThree } from '@react-three/fiber';
 
 interface ChairSimulationProps {
   lightOn: boolean;
@@ -13,238 +14,24 @@ interface ChairSimulationProps {
   storageOpen: boolean;
 }
 
-const ChairSimulation: React.FC<ChairSimulationProps> = ({
-  lightOn,
-  reclineAngle,
-  footrestExtended,
-  massageOn,
-  deskOpen,
-  drawerOpen,
-  storageOpen,
+// Chair component for the 3D model
+const Chair = ({ 
+  lightOn, 
+  reclineAngle, 
+  footrestExtended, 
+  massageOn, 
+  deskOpen, 
+  drawerOpen, 
+  storageOpen 
 }) => {
-  const mountRef = useRef<HTMLDivElement>(null);
-  const sceneRef = useRef<THREE.Scene | null>(null);
-  const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
-  const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
-  const controlsRef = useRef<OrbitControls | null>(null);
-  const chairRef = useRef<THREE.Group | null>(null);
-  const chairLightRef = useRef<THREE.PointLight | null>(null);
-  const chairBackRef = useRef<THREE.Mesh | null>(null);
-  const footrestRef = useRef<THREE.Mesh | null>(null);
-  const deskRef = useRef<THREE.Mesh | null>(null);
-  const drawerRef = useRef<THREE.Mesh | null>(null);
-  const storageRef = useRef<THREE.Mesh | null>(null);
-  const frameRef = useRef<number>(0);
-
-  // Sound effects
-  const playSound = (soundType: string) => {
-    const sounds: Record<string, string> = {
-      recline: 'chair_recline.mp3',
-      footrest: 'footrest_move.mp3',
-      light: 'light_switch.mp3',
-      massage: 'massage_motor.mp3',
-      desk: 'desk_open.mp3',
-      drawer: 'drawer_open.mp3',
-      storage: 'storage_open.mp3',
-    };
-    
-    // In a real implementation, we would load and play actual sound files
-    console.log(`Playing sound: ${sounds[soundType]}`);
-  };
-
-  // Initialize the 3D scene
-  useEffect(() => {
-    if (!mountRef.current) return;
-
-    // Scene setup
-    const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x221F26);
-    sceneRef.current = scene;
-
-    // Camera setup
-    const camera = new THREE.PerspectiveCamera(
-      75,
-      mountRef.current.clientWidth / mountRef.current.clientHeight,
-      0.1,
-      1000
-    );
-    camera.position.z = 5;
-    camera.position.y = 2;
-    cameraRef.current = camera;
-
-    // Renderer setup
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
-    renderer.setSize(mountRef.current.clientWidth, mountRef.current.clientHeight);
-    renderer.shadowMap.enabled = true;
-    mountRef.current.appendChild(renderer.domElement);
-    rendererRef.current = renderer;
-
-    // Controls setup
-    const controls = new OrbitControls(camera, renderer.domElement);
-    controls.enableDamping = true;
-    controls.dampingFactor = 0.05;
-    controlsRef.current = controls;
-
-    // Lighting
-    const ambientLight = new THREE.AmbientLight(0x404040, 0.5);
-    scene.add(ambientLight);
-
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-    directionalLight.position.set(5, 5, 5);
-    directionalLight.castShadow = true;
-    scene.add(directionalLight);
-
-    // Chair group
-    const chairGroup = new THREE.Group();
-    scene.add(chairGroup);
-    chairRef.current = chairGroup;
-
-    // Chair base
-    const baseGeometry = new THREE.BoxGeometry(2, 0.2, 2);
-    const baseMaterial = new THREE.MeshPhongMaterial({ color: 0x333333 });
-    const baseBox = new THREE.Mesh(baseGeometry, baseMaterial);
-    baseBox.position.y = -1.5;
-    baseBox.receiveShadow = true;
-    chairGroup.add(baseBox);
-
-    // Chair seat
-    const seatGeometry = new THREE.BoxGeometry(1.5, 0.3, 1.5);
-    const seatMaterial = new THREE.MeshPhongMaterial({ color: 0x8B5CF6 });
-    const seatBox = new THREE.Mesh(seatGeometry, seatMaterial);
-    seatBox.position.y = -1;
-    seatBox.castShadow = true;
-    seatBox.receiveShadow = true;
-    chairGroup.add(seatBox);
-
-    // Chair back
-    const backGeometry = new THREE.BoxGeometry(1.4, 1.8, 0.3);
-    const backMaterial = new THREE.MeshPhongMaterial({ color: 0x8B5CF6 });
-    const backBox = new THREE.Mesh(backGeometry, backMaterial);
-    backBox.position.set(0, 0, -0.75);
-    backBox.castShadow = true;
-    backBox.receiveShadow = true;
-    chairGroup.add(backBox);
-    chairBackRef.current = backBox;
-
-    // Footrest
-    const footrestGeometry = new THREE.BoxGeometry(1.4, 0.3, 0.8);
-    const footrestMaterial = new THREE.MeshPhongMaterial({ color: 0x8B5CF6 });
-    const footrestBox = new THREE.Mesh(footrestGeometry, footrestMaterial);
-    footrestBox.position.set(0, -1.15, 1.15);
-    footrestBox.visible = false;
-    footrestBox.castShadow = true;
-    footrestBox.receiveShadow = true;
-    chairGroup.add(footrestBox);
-    footrestRef.current = footrestBox;
-
-    // Desk
-    const deskGeometry = new THREE.BoxGeometry(1.2, 0.1, 0.8);
-    const deskMaterial = new THREE.MeshPhongMaterial({ color: 0x33C3F0 });
-    const deskBox = new THREE.Mesh(deskGeometry, deskMaterial);
-    deskBox.position.set(0, -0.7, 0.9);
-    deskBox.visible = false;
-    deskBox.castShadow = true;
-    deskBox.receiveShadow = true;
-    chairGroup.add(deskBox);
-    deskRef.current = deskBox;
-
-    // Drawer
-    const drawerGeometry = new THREE.BoxGeometry(0.6, 0.15, 0.4);
-    const drawerMaterial = new THREE.MeshPhongMaterial({ color: 0xD946EF });
-    const drawerBox = new THREE.Mesh(drawerGeometry, drawerMaterial);
-    drawerBox.position.set(0.8, -0.7, 0.9);
-    drawerBox.visible = false;
-    drawerBox.castShadow = true;
-    drawerBox.receiveShadow = true;
-    chairGroup.add(drawerBox);
-    drawerRef.current = drawerBox;
-
-    // Storage compartment
-    const storageGeometry = new THREE.BoxGeometry(0.5, 0.5, 1);
-    const storageMaterial = new THREE.MeshPhongMaterial({ color: 0xD946EF });
-    const storageBox = new THREE.Mesh(storageGeometry, storageMaterial);
-    storageBox.position.set(-1, -0.7, 0);
-    storageBox.visible = false;
-    storageBox.castShadow = true;
-    storageBox.receiveShadow = true;
-    chairGroup.add(storageBox);
-    storageRef.current = storageBox;
-
-    // Chair light
-    const chairLight = new THREE.PointLight(0xFFFFFF, 0, 3);
-    chairLight.position.set(0, 1, 0);
-    chairGroup.add(chairLight);
-    chairLightRef.current = chairLight;
-
-    // Charging indicators
-    const chargerGeometry = new THREE.SphereGeometry(0.1, 16, 16);
-    
-    // Laptop charger
-    const laptopChargerMaterial = new THREE.MeshPhongMaterial({ 
-      color: 0x33C3F0,
-      emissive: 0x33C3F0,
-      emissiveIntensity: 0.5
-    });
-    const laptopCharger = new THREE.Mesh(chargerGeometry, laptopChargerMaterial);
-    laptopCharger.position.set(0.8, -0.9, -0.5);
-    chairGroup.add(laptopCharger);
-
-    // Mobile charger
-    const mobileChargerMaterial = new THREE.MeshPhongMaterial({ 
-      color: 0xD946EF,
-      emissive: 0xD946EF,
-      emissiveIntensity: 0.5
-    });
-    const mobileCharger = new THREE.Mesh(chargerGeometry, mobileChargerMaterial);
-    mobileCharger.position.set(0.8, -0.7, -0.5);
-    chairGroup.add(mobileCharger);
-
-    // Animation loop
-    const animate = () => {
-      frameRef.current = requestAnimationFrame(animate);
-      
-      if (controlsRef.current) {
-        controlsRef.current.update();
-      }
-
-      if (massageOn && chairRef.current) {
-        chairRef.current.position.y = Math.sin(Date.now() * 0.01) * 0.02;
-      }
-
-      if (rendererRef.current && sceneRef.current && cameraRef.current) {
-        rendererRef.current.render(sceneRef.current, cameraRef.current);
-      }
-    };
-    
-    animate();
-
-    // Handle window resize
-    const handleResize = () => {
-      if (!mountRef.current || !cameraRef.current || !rendererRef.current) return;
-      
-      const width = mountRef.current.clientWidth;
-      const height = mountRef.current.clientHeight;
-      
-      cameraRef.current.aspect = width / height;
-      cameraRef.current.updateProjectionMatrix();
-      
-      rendererRef.current.setSize(width, height);
-    };
-
-    window.addEventListener('resize', handleResize);
-    
-    // Cleanup
-    return () => {
-      window.removeEventListener('resize', handleResize);
-      cancelAnimationFrame(frameRef.current);
-      
-      if (rendererRef.current && mountRef.current) {
-        mountRef.current.removeChild(rendererRef.current.domElement);
-        rendererRef.current.dispose();
-      }
-    };
-  }, []);
-
+  const chairRef = useRef(null);
+  const chairLightRef = useRef(null);
+  const chairBackRef = useRef(null);
+  const footrestRef = useRef(null);
+  const deskRef = useRef(null);
+  const drawerRef = useRef(null);
+  const storageRef = useRef(null);
+  
   // Update chair components based on props
   useEffect(() => {
     // Update chair light
@@ -278,12 +65,117 @@ const ChairSimulation: React.FC<ChairSimulationProps> = ({
     }
   }, [lightOn, reclineAngle, footrestExtended, massageOn, deskOpen, drawerOpen, storageOpen]);
 
+  // Animation for massage function
+  useFrame(() => {
+    if (massageOn && chairRef.current) {
+      chairRef.current.position.y = Math.sin(Date.now() * 0.01) * 0.02;
+    }
+  });
+
   return (
-    <div 
-      ref={mountRef} 
-      className="w-full h-full rounded-lg overflow-hidden"
-      style={{ minHeight: '400px' }}
-    />
+    <group ref={chairRef}>
+      {/* Chair base */}
+      <mesh position={[0, -1.5, 0]} receiveShadow>
+        <boxGeometry args={[2, 0.2, 2]} />
+        <meshPhongMaterial color={0x333333} />
+      </mesh>
+
+      {/* Chair seat */}
+      <mesh position={[0, -1, 0]} castShadow receiveShadow>
+        <boxGeometry args={[1.5, 0.3, 1.5]} />
+        <meshPhongMaterial color={0x8B5CF6} />
+      </mesh>
+
+      {/* Chair back */}
+      <mesh ref={chairBackRef} position={[0, 0, -0.75]} castShadow receiveShadow>
+        <boxGeometry args={[1.4, 1.8, 0.3]} />
+        <meshPhongMaterial color={0x8B5CF6} />
+      </mesh>
+
+      {/* Footrest */}
+      <mesh ref={footrestRef} position={[0, -1.15, 1.15]} castShadow receiveShadow visible={footrestExtended}>
+        <boxGeometry args={[1.4, 0.3, 0.8]} />
+        <meshPhongMaterial color={0x8B5CF6} />
+      </mesh>
+
+      {/* Desk */}
+      <mesh ref={deskRef} position={[0, -0.7, 0.9]} castShadow receiveShadow visible={deskOpen}>
+        <boxGeometry args={[1.2, 0.1, 0.8]} />
+        <meshPhongMaterial color={0x33C3F0} />
+      </mesh>
+
+      {/* Drawer */}
+      <mesh ref={drawerRef} position={[0.8, -0.7, 0.9]} castShadow receiveShadow visible={drawerOpen}>
+        <boxGeometry args={[0.6, 0.15, 0.4]} />
+        <meshPhongMaterial color={0xD946EF} />
+      </mesh>
+
+      {/* Storage compartment */}
+      <mesh ref={storageRef} position={[-1, -0.7, 0]} castShadow receiveShadow visible={storageOpen}>
+        <boxGeometry args={[0.5, 0.5, 1]} />
+        <meshPhongMaterial color={0xD946EF} />
+      </mesh>
+
+      {/* Chair light */}
+      <pointLight ref={chairLightRef} position={[0, 1, 0]} intensity={lightOn ? 1 : 0} distance={3} />
+
+      {/* Charging indicators */}
+      <mesh position={[0.8, -0.9, -0.5]}>
+        <sphereGeometry args={[0.1, 16, 16]} />
+        <meshPhongMaterial color={0x33C3F0} emissive={0x33C3F0} emissiveIntensity={0.5} />
+      </mesh>
+
+      <mesh position={[0.8, -0.7, -0.5]}>
+        <sphereGeometry args={[0.1, 16, 16]} />
+        <meshPhongMaterial color={0xD946EF} emissive={0xD946EF} emissiveIntensity={0.5} />
+      </mesh>
+    </group>
+  );
+};
+
+// Scene setup with lights and camera
+const ChairScene = (props) => {
+  const { scene } = useThree();
+  
+  useEffect(() => {
+    // Set scene background
+    scene.background = new THREE.Color(0x221F26);
+  }, [scene]);
+
+  return (
+    <>
+      <ambientLight intensity={0.5} />
+      <directionalLight position={[5, 5, 5]} intensity={0.8} castShadow />
+      <OrbitControls enableDamping dampingFactor={0.05} />
+      <Chair {...props} />
+    </>
+  );
+};
+
+// Main component wrapping the Canvas
+const ChairSimulation: React.FC<ChairSimulationProps> = (props) => {
+  // Sound effects
+  const playSound = (soundType: string) => {
+    const sounds: Record<string, string> = {
+      recline: 'chair_recline.mp3',
+      footrest: 'footrest_move.mp3',
+      light: 'light_switch.mp3',
+      massage: 'massage_motor.mp3',
+      desk: 'desk_open.mp3',
+      drawer: 'drawer_open.mp3',
+      storage: 'storage_open.mp3',
+    };
+    
+    // In a real implementation, we would load and play actual sound files
+    console.log(`Playing sound: ${sounds[soundType]}`);
+  };
+
+  return (
+    <div className="w-full h-full rounded-lg overflow-hidden" style={{ minHeight: '400px' }}>
+      <Canvas shadows camera={{ position: [0, 2, 5], fov: 75 }}>
+        <ChairScene {...props} />
+      </Canvas>
+    </div>
   );
 };
 
